@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 class AirWritingTracker:
-    def __init__(self):
+    def __init__(self, sentence):
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(static_image_mode=False,
                                          max_num_hands=1,
@@ -25,8 +25,8 @@ class AirWritingTracker:
         self.last_word_time = 0
         self.word_start_x = None
         self.word_end_x = None
+        self.sentence = sentence 
        
-
 
     def start(self):
         cap = cv2.VideoCapture(0)
@@ -154,13 +154,30 @@ class AirWritingTracker:
                 'anchor': (self.anchor_position - self.global_anchor).tolist() if self.anchor_position is not None and self.global_anchor is not None else [0, 0, 0]
             })
         if self.sentence_data:
-            filename = f"sentence_{time.strftime('%Y%m%d-%H%M%S')}.json"
+            # Use the sentence in the filename
+            sanitized_sentence = "_".join(self.sentence.split())  # Replace spaces with underscores
+            filename = f"{sanitized_sentence}_{time.strftime('%m%d-%H%M%S')}.json"
             self.save_data(filename)
             print(f"Sentence with {len(self.sentence_data)} words saved to {filename}.")
         self.is_writing = False
         self.current_word_data = []
         self.anchor_position = None
-    
+   
+
+    def save_data(self, filename):
+        data_to_save = {"sentence": self.sentence, "words": []}
+        for word in self.sentence_data:
+            if isinstance(word, dict):
+                data_to_save["words"].append(word)
+            elif isinstance(word, list):
+                data_to_save["words"].append({
+                    'word_data': word,
+                    'anchor': [0, 0, 0]  # Default anchor if not available
+                })
+        with open(filename, 'w') as f:
+            json.dump(data_to_save, f, indent=2)
+        print(f"Data saved to {filename}")
+
 
     def draw_ui(self, image):
         height, width, _ = image.shape
@@ -173,21 +190,6 @@ class AirWritingTracker:
             cv2.putText(image, f"{key}: ({value[0]:.2f}, {value[1]:.2f}, {value[2]:.2f})",
                         (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
             y_offset += 30
-   
-
-    def save_data(self, filename):
-        data_to_save = []
-        for word in self.sentence_data:
-            if isinstance(word, dict):
-                data_to_save.append(word)
-            elif isinstance(word, list):
-                data_to_save.append({
-                    'word_data': word,
-                    'anchor': [0, 0, 0]  # Default anchor if not available
-                })
-        with open(filename, 'w') as f:
-            json.dump(data_to_save, f, indent=2)
-        print(f"Data saved to {filename}")
 
 
     def visualize_data(self, data):
